@@ -1,0 +1,221 @@
+1. Patient Demographics Query
+
+Used for Patient Analysis Dashboard
+
+SELECT
+    p.patient_id,
+    p.gender,
+    p.age,
+    CASE
+        WHEN p.age < 18 THEN 'Under 18'
+        WHEN p.age BETWEEN 18 AND 35 THEN '18–35'
+        WHEN p.age BETWEEN 36 AND 55 THEN '36–55'
+        WHEN p.age BETWEEN 56 AND 75 THEN '56–75'
+        ELSE '75+'
+    END AS age_group,
+    p.state,
+    p.region
+FROM patients p
+WHERE p.is_active = 1;
+
+
+Purpose:
+
+Creates age bands for Power BI slicers
+
+Keeps demographic dimensions lightweight and reusable
+
+2. Hospital Performance & Financial Metrics
+
+Used for Hospital Insights Dashboard
+
+SELECT
+    h.hospital_id,
+    h.hospital_name,
+    h.state,
+    h.region,
+    COUNT(v.visit_id) AS total_visits,
+    SUM(v.total_charge_amount) AS total_charges,
+    SUM(v.insurance_payment_amount) AS insurance_payments,
+    SUM(v.patient_payment_amount) AS patient_payments,
+    SUM(v.total_charge_amount) 
+      - SUM(v.insurance_payment_amount + v.patient_payment_amount)
+      AS accounts_receivable
+FROM hospitals h
+JOIN visits v
+    ON h.hospital_id = v.hospital_id
+GROUP BY
+    h.hospital_id,
+    h.hospital_name,
+    h.state,
+    h.region;
+
+
+Purpose:
+
+Supports AR analysis
+
+Enables insurance payment ratio calculations in DAX
+
+3. Patient Admissions Trend (Time-Series)
+
+Used for Trend Analysis / Executive Summary
+
+SELECT
+    DATE_TRUNC('month', v.admission_date) AS admission_month,
+    COUNT(v.visit_id) AS total_admissions,
+    SUM(v.total_charge_amount) AS total_expenses
+FROM visits v
+GROUP BY DATE_TRUNC('month', v.admission_date)
+ORDER BY admission_month;
+
+
+Purpose:
+
+Optimized for Power BI line charts
+
+Keeps time intelligence simple and performant
+
+4. Payer Contribution & Expense Dispersion
+
+Used for Payer–Provider Analysis Dashboard
+
+SELECT
+    py.payer_id,
+    py.payer_name,
+    COUNT(v.visit_id) AS total_claims,
+    SUM(v.insurance_payment_amount) AS total_paid_amount,
+    AVG(v.insurance_payment_amount) AS avg_payment_per_claim
+FROM payers py
+JOIN visits v
+    ON py.payer_id = v.payer_id
+GROUP BY
+    py.payer_id,
+    py.payer_name
+ORDER BY total_paid_amount DESC;
+
+
+Purpose:
+
+Identifies high-impact payers
+
+Enables Pareto and ranking visuals
+
+5. Provider Performance Analysis
+
+Used for Provider-Level Insights
+
+SELECT
+    pr.provider_id,
+    pr.provider_name,
+    pr.specialty,
+    COUNT(v.visit_id) AS total_procedures,
+    SUM(v.total_charge_amount) AS total_revenue
+FROM providers pr
+JOIN visits v
+    ON pr.provider_id = v.provider_id
+GROUP BY
+    pr.provider_id,
+    pr.provider_name,
+    pr.specialty;
+
+
+Purpose:
+
+Supports provider benchmarking
+
+Clean grain for Power BI relationships
+
+6. Procedure Volume Dominance
+
+Used for Procedure Dominance Recognition
+
+SELECT
+    h.hospital_name,
+    v.procedure_code,
+    COUNT(v.visit_id) AS procedure_count
+FROM visits v
+JOIN hospitals h
+    ON v.hospital_id = h.hospital_id
+GROUP BY
+    h.hospital_name,
+    v.procedure_code
+HAVING COUNT(v.visit_id) > 100
+ORDER BY procedure_count DESC;
+
+
+Purpose:
+
+Identifies hospitals dominating specific procedures
+
+Useful for heatmaps and ranking visuals
+
+7. Region-Level Pandemic Impact Analysis
+
+Used for Regional Impact Analysis
+
+SELECT
+    h.region,
+    COUNT(DISTINCT v.patient_id) AS affected_patients,
+    SUM(v.total_charge_amount) AS total_expenses
+FROM visits v
+JOIN hospitals h
+    ON v.hospital_id = h.hospital_id
+WHERE v.admission_date BETWEEN '2020-01-01' AND '2022-12-31'
+GROUP BY h.region
+ORDER BY total_expenses DESC;
+
+
+Purpose:
+
+Focused pandemic window
+
+High-level aggregation for executives
+
+8. Power BI–Optimized Fact Table (Best Practice)
+
+This is ideal for Import Mode in Power BI:
+
+SELECT
+    v.visit_id,
+    v.patient_id,
+    v.hospital_id,
+    v.provider_id,
+    v.payer_id,
+    v.procedure_code,
+    v.admission_date,
+    v.discharge_date,
+    v.total_charge_amount,
+    v.insurance_payment_amount,
+    v.patient_payment_amount
+FROM visits v
+WHERE v.admission_date >= '2018-01-01';
+
+
+Purpose:
+
+Clean fact table
+
+DAX handles calculations
+
+Improves refresh and model performance
+
+Recommended Power BI Data Model
+
+Star Schema
+
+Fact: visits
+
+Dimensions:
+
+patients
+
+hospitals
+
+providers
+
+payers
+
+date
+
+This structure minimizes DAX complexity and improves performance.

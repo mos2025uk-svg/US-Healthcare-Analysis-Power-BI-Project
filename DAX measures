@@ -1,0 +1,291 @@
+Below are **production-grade DAX measures** aligned directly with your **US Healthcare Analysis Power BI model**. These measures assume a **star schema** with a central **Fact_Visits** table and standard dimension tables (Patients, Hospitals, Providers, Payers, Date).
+
+The measures are written to be **efficient, reusable, and executive-ready**.
+
+---
+
+## 1. Core Volume & Financial Measures
+
+### Total Visits
+
+```DAX
+Total Visits =
+COUNT ( Fact_Visits[visit_id] )
+```
+
+### Total Charges
+
+```DAX
+Total Charges =
+SUM ( Fact_Visits[total_charge_amount] )
+```
+
+### Insurance Payments
+
+```DAX
+Insurance Payments =
+SUM ( Fact_Visits[insurance_payment_amount] )
+```
+
+### Patient Payments
+
+```DAX
+Patient Payments =
+SUM ( Fact_Visits[patient_payment_amount] )
+```
+
+---
+
+## 2. Accounts Receivable & Payment Ratios
+
+### Accounts Receivable (AR)
+
+```DAX
+Accounts Receivable =
+[Total Charges] - ( [Insurance Payments] + [Patient Payments] )
+```
+
+### Insurance Payment Ratio
+
+```DAX
+Insurance Payment Ratio (%) =
+DIVIDE ( [Insurance Payments], [Total Charges], 0 )
+```
+
+### Patient Payment Ratio
+
+```DAX
+Patient Payment Ratio (%) =
+DIVIDE ( [Patient Payments], [Total Charges], 0 )
+```
+
+---
+
+## 3. Patient & Admission Analytics
+
+### Total Patients
+
+```DAX
+Total Patients =
+DISTINCTCOUNT ( Fact_Visits[patient_id] )
+```
+
+### Average Charge per Visit
+
+```DAX
+Avg Charge per Visit =
+DIVIDE ( [Total Charges], [Total Visits], 0 )
+```
+
+### Average Length of Stay (Days)
+
+```DAX
+Avg Length of Stay =
+AVERAGEX (
+    Fact_Visits,
+    DATEDIFF (
+        Fact_Visits[admission_date],
+        Fact_Visits[discharge_date],
+        DAY
+    )
+)
+```
+
+---
+
+## 4. Time Intelligence Measures
+
+Assumes a properly marked **Date** table related to `Fact_Visits[admission_date]`.
+
+### Total Charges YTD
+
+```DAX
+Total Charges YTD =
+TOTALYTD (
+    [Total Charges],
+    'Date'[Date]
+)
+```
+
+### Total Charges YoY Growth %
+
+```DAX
+Total Charges YoY % =
+VAR PrevYearCharges =
+    CALCULATE (
+        [Total Charges],
+        SAMEPERIODLASTYEAR ( 'Date'[Date] )
+    )
+RETURN
+DIVIDE (
+    [Total Charges] - PrevYearCharges,
+    PrevYearCharges,
+    0
+)
+```
+
+### Admissions MoM Growth %
+
+```DAX
+Admissions MoM % =
+VAR PrevMonthVisits =
+    CALCULATE (
+        [Total Visits],
+        DATEADD ( 'Date'[Date], -1, MONTH )
+    )
+RETURN
+DIVIDE (
+    [Total Visits] - PrevMonthVisits,
+    PrevMonthVisits,
+    0
+)
+```
+
+---
+
+## 5. Hospital Performance Measures
+
+### Visits per Hospital
+
+```DAX
+Visits per Hospital =
+[Total Visits]
+```
+
+(Used with Hospital dimension in visuals)
+
+### Hospital AR Rank
+
+```DAX
+Hospital AR Rank =
+RANKX (
+    ALL ( Hospitals[hospital_name] ),
+    [Accounts Receivable],
+    ,
+    DESC,
+    DENSE
+)
+```
+
+---
+
+## 6. Payer & Provider Performance
+
+### Total Claims
+
+```DAX
+Total Claims =
+[Total Visits]
+```
+
+### Avg Insurance Payment per Claim
+
+```DAX
+Avg Insurance Payment per Claim =
+DIVIDE ( [Insurance Payments], [Total Claims], 0 )
+```
+
+### Payer Contribution %
+
+```DAX
+Payer Contribution % =
+DIVIDE (
+    [Insurance Payments],
+    CALCULATE ( [Insurance Payments], ALL ( Payers ) ),
+    0
+)
+```
+
+---
+
+## 7. Procedure & Utilization Analysis
+
+### Procedure Volume
+
+```DAX
+Procedure Volume =
+COUNT ( Fact_Visits[procedure_code] )
+```
+
+### Procedure Share %
+
+```DAX
+Procedure Share % =
+DIVIDE (
+    [Procedure Volume],
+    CALCULATE ( [Procedure Volume], ALL ( Fact_Visits[procedure_code] ) ),
+    0
+)
+```
+
+---
+
+## 8. Regional Impact Analysis
+
+### Regional Patients
+
+```DAX
+Regional Patients =
+DISTINCTCOUNT ( Fact_Visits[patient_id] )
+```
+
+### Regional Expense Share %
+
+```DAX
+Regional Expense Share % =
+DIVIDE (
+    [Total Charges],
+    CALCULATE ( [Total Charges], ALL ( Hospitals[region] ) ),
+    0
+)
+```
+
+---
+
+## 9. Pandemic-Specific Measures (Optional)
+
+### Pandemic Visits
+
+```DAX
+Pandemic Visits =
+CALCULATE (
+    [Total Visits],
+    Fact_Visits[admission_date] >= DATE ( 2020, 1, 1 ),
+    Fact_Visits[admission_date] <= DATE ( 2022, 12, 31 )
+)
+```
+
+### Pandemic Expense Impact
+
+```DAX
+Pandemic Expense Impact =
+CALCULATE (
+    [Total Charges],
+    Fact_Visits[admission_date] >= DATE ( 2020, 1, 1 ),
+    Fact_Visits[admission_date] <= DATE ( 2022, 12, 31 )
+)
+```
+
+---
+
+## 10. Executive KPI Measures
+
+### Cost per Patient
+
+```DAX
+Cost per Patient =
+DIVIDE ( [Total Charges], [Total Patients], 0 )
+```
+
+### Revenue Realization Rate
+
+```DAX
+Revenue Realization Rate % =
+DIVIDE (
+    [Insurance Payments] + [Patient Payments],
+    [Total Charges],
+    0
+)
+```
+
+
